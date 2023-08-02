@@ -1,0 +1,10 @@
+{
+  "dependencies": {
+    "@trpc/server": "^10.36.0",
+    "nodemon": "^3.0.1",
+    "ts-node": "^10.9.1"
+  },
+  "scripts": {
+    "server": "npx nodemon ./src/main.ts"
+  }
+}
