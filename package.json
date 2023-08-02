@@ -1,0 +1,13 @@
+{
+  "dependencies": {
+    "@trpc/client": "^10.36.0",
+    "@trpc/server": "^10.36.0",
+    "nodemon": "^3.0.1",
+    "ts-node": "^10.9.1",
+    "zod": "^3.21.4"
+  },
+  "scripts": {
+    "server": "npx nodemon ./src/main.ts",
+    "client": "npx nodemon ./testing_on_client/main.ts"
+  }
+}
