@@ -1,10 +1,19 @@
-import * as trpc from "@trpc/server";
-import { publicProcedure, router } from "./trpc";
+import { initTRPC } from "@trpc/server";
+import { createHTTPServer } from "@trpc/server/adapters/standalone";
+
+const t = initTRPC.create();
+
+const router = t.router;
 
 const appRouter = router({
-  greeting: publicProcedure.query(() => "hello tRPC v10!"),
+  greeting: t.procedure.query(() => "hello world gay"),
 });
 
-// Export only the type of a router!
-// This prevents us from importing server code on the client.
+createHTTPServer({
+  router: appRouter,
+  createContext() {
+    return {};
+  },
+}).listen(5000);
+
 export type AppRouter = typeof appRouter;
