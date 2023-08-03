@@ -28,12 +28,20 @@ enum GroupVisibility {
 }
 
 model Group {
-  id                 String          @id @default(uuid())
+  id                 String             @id @default(uuid())
   title              String
-  isPublicForViewing Boolean         @default(true)
-  creator            User            @relation(fields: [creatorId], references: [id])
+  isPublicForViewing Boolean            @default(true)
+  creator            User               @relation(fields: [creatorId], references: [id])
   creatorId          String
-  groupVisibility    GroupVisibility @default(PRIVATE)
+  groupVisibility    GroupVisibility    @default(PRIVATE)
+  groupInvitations   GroupInvitations[]
+}
+
+model GroupInvitations {
+  key     String  @id @default(uuid())
+  group   Group   @relation(fields: [groupId], references: [id])
+  groupId String
+  userId  String?
 }
 
 enum Role {
