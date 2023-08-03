@@ -18,18 +18,29 @@ model User {
   profilePictureUrl String
   isBanned          Boolean @default(false)
   createdAt         BigInt
+  groups            Group[]
+}
+
+enum GroupVisibility {
+  PUBLIC
+  UNLISTED
+  PRIVATE
 }
 
 model Group {
-  id                 String  @id @default(uuid())
+  id                 String          @id @default(uuid())
   title              String
-  isPublicForViewing Boolean @default(true)
+  isPublicForViewing Boolean         @default(true)
+  creator            User            @relation(fields: [creatorId], references: [id])
+  creatorId          String
+  groupVisibility    GroupVisibility @default(PRIVATE)
 }
 
 enum Role {
   VIEWER
   USER
   ADMIN
+  CREATOR
 }
 
 model UserToGroupRelation {

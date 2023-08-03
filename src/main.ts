@@ -2,11 +2,8 @@ import * as trpc from "@trpc/server/adapters/express";
 import cors from "cors";
 import express from "express";
 import clerkRouter from "./clerk";
-import { createContext, puclicProcedure, t } from "./trpc";
-
-const appRouter = t.router({
-  greeting: puclicProcedure.query(() => "hello nigga"),
-});
+import { createContext } from "./trpc";
+import { appRouter } from "./routers";
 
 const app = express();
 app.use(cors());
