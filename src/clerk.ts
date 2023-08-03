@@ -26,10 +26,10 @@ clerkRouter.post(
     }
 
     const data: UserJSON = msg.data;
+    let user: any;
     switch (msg.type) {
       case "user.created":
-        console.log("User created");
-        const user = await prisma.user.create({
+        user = await prisma.user.create({
           data: {
             id: data.id,
             firstName: data.first_name,
@@ -41,7 +41,27 @@ clerkRouter.post(
             createdAt: data.created_at,
           },
         });
-        console.log(user);
+        console.log("User created with ID: " + data.id);
+      case "user.updated":
+        user = await prisma.user.update({
+          where: { id: data.id },
+          data: {
+            id: data.id,
+            firstName: data.first_name,
+            lastName: data.last_name,
+            email: data.email_addresses.find(
+              (mail) => mail.id === data.primary_email_address_id
+            )!.email_address,
+            profilePictureUrl: data.profile_image_url,
+            createdAt: data.created_at,
+          },
+        });
+        console.log("User with ID: " + data.id + " updated his ACC!");
+      case "user.deleted":
+        user = await prisma.user.delete({
+          where: { id: data.id },
+        });
+        console.log("User with ID: " + data.id + " deleted his ACC!");
     }
 
     res.json({});
