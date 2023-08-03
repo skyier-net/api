@@ -19,3 +19,25 @@ model User {
   isBanned          Boolean @default(false)
   createdAt         BigInt
 }
+
+model Group {
+  id                 String  @id @default(uuid())
+  title              String
+  isPublicForViewing Boolean @default(true)
+}
+
+enum Role {
+  VIEWER
+  USER
+  ADMIN
+}
+
+model UserToGroupRelation {
+  id       String  @id @default(uuid())
+  userId   String
+  groupId  String
+  isBanned Boolean @default(false)
+  role     Role    @default(USER)
+
+  @@unique([userId, groupId])
+}
