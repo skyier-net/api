@@ -1,19 +1,29 @@
-import { initTRPC } from "@trpc/server";
-import { createHTTPServer } from "@trpc/server/adapters/standalone";
+import { inferAsyncReturnType, initTRPC } from "@trpc/server";
+import * as trpc from "@trpc/server/adapters/express";
+import cors from "cors";
+import express from "express";
+import clerkRouter from "./clerk";
 
-const t = initTRPC.create();
+const createContext = ({ req, res }: trpc.CreateExpressContextOptions) => ({});
+type Context = inferAsyncReturnType<typeof createContext>;
+const t = initTRPC.context<Context>().create();
 
-const router = t.router;
+const puclicProcedure = t.procedure;
 
-const appRouter = router({
-  greeting: t.procedure.query(() => "hello world gay"),
+const appRouter = t.router({
+  greeting: puclicProcedure.query(() => "hello nigga"),
 });
 
-createHTTPServer({
-  router: appRouter,
-  createContext() {
-    return {};
-  },
-}).listen(5000);
+const app = express();
+app.use(cors());
+app.use(
+  "/trpc",
+  trpc.createExpressMiddleware({
+    router: appRouter,
+    createContext,
+  })
+);
 
-export type AppRouter = typeof appRouter;
+app.use("/clerk", clerkRouter);
+
+app.listen(5000);
