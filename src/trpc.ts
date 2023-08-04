@@ -44,5 +44,32 @@ const isAuthed = t.middleware((opts) => {
   });
 });
 
+const isAdmin = t.middleware(async (opts) => {
+  if (!opts.ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+  const userGroupRelation = await prisma.userToGroupRelation.findUniqueOrThrow({
+    where: {
+      userId_groupId: {
+        userId: opts.ctx.user.id,
+        groupId: (opts.input as any).groupId,
+      },
+    },
+    select: {
+      role: true,
+    },
+  });
+  if (
+    userGroupRelation.role !== "ADMIN" &&
+    userGroupRelation.role !== "CREATOR"
+  )
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  return opts.next({
+    ctx: {
+      user: opts.ctx.user,
+      role: userGroupRelation.role,
+    },
+  });
+});
+
 export const puclicProcedure = t.procedure;
 export const protectedProcedure = t.procedure.use(isAuthed);
+export const adminProcedure = t.procedure.use(isAdmin);

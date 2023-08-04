@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { protectedProcedure, t } from "../trpc";
+import { adminProcedure, protectedProcedure, t } from "../trpc";
 import { GroupVisibility, Role } from "@prisma/client";
 import nodemailer from "nodemailer";
 import "dotenv/config";
@@ -18,7 +18,7 @@ const transporter = nodemailer.createTransport({
 });
 
 export const groupsRouter = t.router({
-  createGroup: protectedProcedure
+  createGroup: adminProcedure
     .input(
       z.object({
         title: z.string().min(7).max(50),
@@ -55,7 +55,7 @@ export const groupsRouter = t.router({
         groupId: group.id,
       };
     }),
-  inviteMember: protectedProcedure
+  inviteMember: adminProcedure
     .input(
       z
         .object({
@@ -86,14 +86,6 @@ export const groupsRouter = t.router({
           group: true,
         },
       });
-      const inviterGroupRelation = await prisma.userToGroupRelation.findUnique({
-        where: {
-          userId_groupId: {
-            userId: opts.ctx.user!.id,
-            groupId: opts.input.groupId,
-          },
-        },
-      });
       transporter.sendMail(
         {
           from: "no-reply@skyier.net",
@@ -101,13 +93,13 @@ export const groupsRouter = t.router({
           subject: `${invitation.group?.title} group invited You to JOIN!`,
           html: `
           <h2>The group <i>${invitation.group?.title}</i> invited You to JOIN!<br></h2>
-          <p><strong>${opts.ctx.user?.firstName} ${opts.ctx.user?.lastName}</strong> who is <i>${inviterGroupRelation?.role}</i> in the <strong>${invitation.group?.title}</strong> group invited You to JOIN!</p><br>
+          <p><strong>${opts.ctx.user?.firstName} ${opts.ctx.user?.lastName}</strong> who is <i>${opts.ctx.role}</i> in the <strong>${invitation.group?.title}</strong> group invited You to JOIN!</p><br>
           <p>There description states so: <i>${invitation.group?.description}</i></p>
           <p>To join the group <strong><a href="http://localhost:3000/groups/${invitation.group?.id}/join">CLICK HERE</a></strong> or open the link below:</p><br>
           <p>http://localhost:3000/groups/${invitation.group?.id}/join</p>
           `,
         },
-        function (error, info) {
+        (error, info) => {
           if (error) {
             console.log(error);
           } else {
