@@ -57,6 +57,30 @@ export const groupsRouter = t.router({
         groupId: group.id,
       };
     }),
+  editGroup: adminProcedure
+    .input(
+      z.object({
+        description: z.string().min(20).max(250),
+        isPublicForViewing: z.boolean(),
+        title: z.string().min(7).max(50),
+        groupId: z.string(),
+      })
+    )
+    .mutation(async (opts) => {
+      const group = await prisma.group.update({
+        where: {
+          id: opts.input.groupId,
+        },
+        data: {
+          description: opts.input.description,
+          isPublicForViewing: opts.input.isPublicForViewing,
+          title: opts.input.title,
+        },
+      });
+      return {
+        groupId: group.id,
+      };
+    }),
   inviteMember: adminProcedure
     .input(
       z
