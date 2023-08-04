@@ -45,6 +45,7 @@ model GroupInvitation {
   groupId   String
   mail      String?
   inviter   User    @relation(fields: [inviterId], references: [id])
+  role      Role
   inviterId String
 }
 
@@ -57,7 +58,6 @@ enum Role {
 
 model UserToGroupRelation {
   id         String  @id @default(uuid())
-  key        String
   userId     String
   groupId    String
   isBanned   Boolean @default(false)

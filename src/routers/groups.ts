@@ -6,6 +6,7 @@ import "dotenv/config";
 
 import { PrismaClient } from "@prisma/client";
 import { WEB_APP_URL } from "../config";
+import { TRPCError } from "@trpc/server";
 const prisma = new PrismaClient();
 
 const transporter = nodemailer.createTransport({
@@ -50,7 +51,6 @@ export const groupsRouter = t.router({
           userId: opts.ctx.user!.id,
           groupId: group.id,
           role: "CREATOR" as Role,
-          key: Math.floor(Math.random() * 1000000).toString(),
         },
       });
       return {
@@ -63,6 +63,7 @@ export const groupsRouter = t.router({
         .object({
           mail: z.string(),
           groupId: z.string(),
+          role: z.enum(["ADMIN", "MEMBER", "VIEWER"]),
         })
         .partial({
           mail: true,
@@ -73,6 +74,7 @@ export const groupsRouter = t.router({
         data: {
           mail: opts.input.mail,
           key: Math.floor(Math.random() * 1000000).toString(),
+          role: opts.input.role as Role,
           group: {
             connect: {
               id: opts.input.groupId,
@@ -113,6 +115,37 @@ export const groupsRouter = t.router({
         }
       );
       return {};
+    }),
+  joinGroup: protectedProcedure
+    .input(
+      z.object({
+        key: z.string(),
+      })
+    )
+    .mutation(async (opts) => {
+      const invitation = await prisma.groupInvitation.delete({
+        where: {
+          key: opts.input.key,
+        },
+        include: {
+          group: true,
+        },
+      });
+      if (!invitation) throw new TRPCError({ code: "NOT_FOUND" });
+      if (opts.ctx.user.email != invitation.mail)
+        throw new TRPCError({ code: "UNAUTHORIZED" });
+      const user = await prisma.user.findUniqueOrThrow({
+        where: {
+          email: invitation.mail,
+        },
+      });
+      const relation = await prisma.userToGroupRelation.create({
+        data: {
+          groupId: invitation.group.id,
+          userId: opts.ctx.user!.id,
+          role: invitation.role,
+        },
+      });
     }),
   banMember: adminProcedure
     .input(
