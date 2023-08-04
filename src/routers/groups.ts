@@ -5,6 +5,7 @@ import nodemailer from "nodemailer";
 import "dotenv/config";
 
 import { PrismaClient } from "@prisma/client";
+import { WEB_APP_URL } from "../config";
 const prisma = new PrismaClient();
 
 const transporter = nodemailer.createTransport({
@@ -49,6 +50,7 @@ export const groupsRouter = t.router({
           userId: opts.ctx.user!.id,
           groupId: group.id,
           role: "CREATOR" as Role,
+          key: Math.floor(Math.random() * 1000000).toString(),
         },
       });
       return {
@@ -70,6 +72,7 @@ export const groupsRouter = t.router({
       const invitation = await prisma.groupInvitation.create({
         data: {
           mail: opts.input.mail,
+          key: Math.floor(Math.random() * 1000000).toString(),
           group: {
             connect: {
               id: opts.input.groupId,
@@ -95,8 +98,10 @@ export const groupsRouter = t.router({
           <h2>The group <i>${invitation.group?.title}</i> invited You to JOIN!<br></h2>
           <p><strong>${opts.ctx.user?.firstName} ${opts.ctx.user?.lastName}</strong> who is <i>${opts.ctx.role}</i> in the <strong>${invitation.group?.title}</strong> group invited You to JOIN!</p><br>
           <p>There description states so: <i>${invitation.group?.description}</i></p>
-          <p>To join the group <strong><a href="http://localhost:3000/groups/${invitation.group?.id}/join">CLICK HERE</a></strong> or open the link below:</p><br>
-          <p>http://localhost:3000/groups/${invitation.group?.id}/join</p>
+          <p>To join the group <strong><a href="${WEB_APP_URL}/groups/${invitation.key}/join">CLICK HERE</a></strong> or open the link below:</p><br>
+          <p>${WEB_APP_URL}/groups/${invitation.key}/join</p>
+          <br>
+          <p>You can also enter the code <strong>${invitation.key}</strong> in the code field of your <i>mobile app</i></p>
           `,
         },
         (error, info) => {
@@ -107,5 +112,65 @@ export const groupsRouter = t.router({
           }
         }
       );
+      return {};
+    }),
+  banMember: adminProcedure
+    .input(
+      z.object({
+        userId: z.string(),
+        groupId: z.string(),
+      })
+    )
+    .mutation(async (opts) => {
+      const userToGroupRelation = await prisma.userToGroupRelation.update({
+        where: {
+          userId_groupId: {
+            userId: opts.input.userId,
+            groupId: opts.input.groupId,
+          },
+        },
+        data: {
+          isBanned: true,
+        },
+      });
+    }),
+  muteMember: adminProcedure
+    .input(
+      z.object({
+        userId: z.string(),
+        groupId: z.string(),
+        hoursForMute: z.number(),
+      })
+    )
+    .mutation(async (opts) => {
+      const userToGroupRelation = await prisma.userToGroupRelation.update({
+        where: {
+          userId_groupId: {
+            userId: opts.input.userId,
+            groupId: opts.input.groupId,
+          },
+        },
+        data: {
+          mutedUntil:
+            new Date().getTime() / 1000 + 60 * 60 * opts.input.hoursForMute,
+        },
+      });
+    }),
+  kickMember: adminProcedure
+    .input(
+      z.object({
+        userId: z.string(),
+        groupId: z.string(),
+      })
+    )
+    .mutation(async (opts) => {
+      const userToGroupRelation = await prisma.userToGroupRelation.delete({
+        where: {
+          userId_groupId: {
+            userId: opts.input.userId,
+            groupId: opts.input.groupId,
+          },
+        },
+      });
     }),
 });

@@ -56,11 +56,13 @@ enum Role {
 }
 
 model UserToGroupRelation {
-  id       String  @id @default(uuid())
-  userId   String
-  groupId  String
-  isBanned Boolean @default(false)
-  role     Role    @default(USER)
+  id         String  @id @default(uuid())
+  key        String
+  userId     String
+  groupId    String
+  isBanned   Boolean @default(false)
+  mutedUntil BigInt?
+  role       Role    @default(USER)
 
   @@unique([userId, groupId])
 }
