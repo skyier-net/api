@@ -11,11 +11,58 @@ datasource db {
 }
 
 model User {
-  id                String  @id @unique
+  id                String            @id @unique
   firstName         String
   lastName          String
-  email             String  @unique
+  email             String            @unique
   profilePictureUrl String
-  isBanned          Boolean @default(false)
+  isBanned          Boolean           @default(false)
   createdAt         BigInt
+  groups            Group[]
+  GroupInvitation   GroupInvitation[]
+}
+
+enum GroupVisibility {
+  PUBLIC
+  UNLISTED
+  PRIVATE
+}
+
+model Group {
+  id                 String            @id @default(uuid())
+  title              String
+  isPublicForViewing Boolean           @default(true)
+  creator            User              @relation(fields: [creatorId], references: [id])
+  creatorId          String
+  groupVisibility    GroupVisibility   @default(PUBLIC)
+  description        String
+  invites            GroupInvitation[]
+}
+
+model GroupInvitation {
+  key       String  @id @default(uuid())
+  group     Group   @relation(fields: [groupId], references: [id])
+  groupId   String
+  mail      String?
+  inviter   User    @relation(fields: [inviterId], references: [id])
+  role      Role
+  inviterId String
+}
+
+enum Role {
+  VIEWER
+  USER
+  ADMIN
+  CREATOR
+}
+
+model UserToGroupRelation {
+  id         String  @id @default(uuid())
+  userId     String
+  groupId    String
+  isBanned   Boolean @default(false)
+  mutedUntil BigInt?
+  role       Role    @default(USER)
+
+  @@unique([userId, groupId])
 }
