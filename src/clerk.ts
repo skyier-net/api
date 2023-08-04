@@ -1,6 +1,7 @@
 import type { WebhookEvent, UserJSON } from "@clerk/clerk-sdk-node";
 import { Webhook } from "svix";
 import bodyParser from "body-parser";
+import "dotenv/config";
 
 import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
@@ -8,7 +9,7 @@ const prisma = new PrismaClient();
 import express from "express";
 const clerkRouter = express.Router();
 
-const secret = "whsec_jm25hp7VmgpItc6owrivu8j0n+PaZh9q";
+const secret = process.env.CLERK_WEBHOOK_SECRET!;
 
 clerkRouter.post(
   "/webhook",
