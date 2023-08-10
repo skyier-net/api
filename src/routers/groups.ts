@@ -33,7 +33,7 @@ export const groupsRouter = t.router({
       const group = await prisma.group.create({
         data: {
           title: opts.input.title,
-          defaultRole: opts.input.defaultRole ?? ("VIEWER" as Role),
+          defaultRole: (opts.input.defaultRole ?? "VIEWER") as Role,
           creator: {
             connect: {
               id: opts.ctx.user?.id,
@@ -61,7 +61,7 @@ export const groupsRouter = t.router({
     .input(
       z.object({
         description: z.string().min(20).max(250),
-        isPublicForViewing: z.boolean(),
+        defaultRole: z.enum(["ADMIN", "MEMBER", "VIEWER"]).or(z.null()),
         title: z.string().min(7).max(50),
         groupId: z.string(),
       })
@@ -73,7 +73,7 @@ export const groupsRouter = t.router({
         },
         data: {
           description: opts.input.description,
-          isPublicForViewing: opts.input.isPublicForViewing,
+          defaultRole: (opts.input.defaultRole ?? "VIEWER") as Role,
           title: opts.input.title,
         },
       });

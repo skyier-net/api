@@ -28,6 +28,7 @@ clerkRouter.post(
 
     const data: UserJSON = msg.data;
     let user: any;
+
     try {
       switch (msg.type) {
         case "user.created":
@@ -44,6 +45,7 @@ clerkRouter.post(
             },
           });
           console.log("User created with ID: " + data.id);
+          break;
         case "user.updated":
           user = await prisma.user.update({
             where: { id: data.id },
@@ -59,11 +61,13 @@ clerkRouter.post(
             },
           });
           console.log("User with ID: " + data.id + " updated his ACC!");
+          break;
         case "user.deleted":
           user = await prisma.user.delete({
             where: { id: data.id },
           });
           console.log("User with ID: " + data.id + " deleted his ACC!");
+          break;
       }
 
       res.json({});
