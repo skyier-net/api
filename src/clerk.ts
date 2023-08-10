@@ -1,6 +1,7 @@
 import type { WebhookEvent, UserJSON } from "@clerk/clerk-sdk-node";
 import { Webhook } from "svix";
 import bodyParser from "body-parser";
+import "dotenv/config";
 
 import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
@@ -8,7 +9,7 @@ const prisma = new PrismaClient();
 import express from "express";
 const clerkRouter = express.Router();
 
-const secret = "whsec_jm25hp7VmgpItc6owrivu8j0n+PaZh9q";
+const secret = process.env.CLERK_WEBHOOKS_SECRET!;
 
 clerkRouter.post(
   "/webhook",
@@ -27,44 +28,49 @@ clerkRouter.post(
 
     const data: UserJSON = msg.data;
     let user: any;
-    switch (msg.type) {
-      case "user.created":
-        user = await prisma.user.create({
-          data: {
-            id: data.id,
-            firstName: data.first_name,
-            lastName: data.last_name,
-            email: data.email_addresses.find(
-              (mail) => mail.id === data.primary_email_address_id
-            )!.email_address,
-            profilePictureUrl: data.profile_image_url,
-            createdAt: data.created_at,
-          },
-        });
-        console.log("User created with ID: " + data.id);
-      case "user.updated":
-        user = await prisma.user.update({
-          where: { id: data.id },
-          data: {
-            id: data.id,
-            firstName: data.first_name,
-            lastName: data.last_name,
-            email: data.email_addresses.find(
-              (mail) => mail.id === data.primary_email_address_id
-            )!.email_address,
-            profilePictureUrl: data.profile_image_url,
-            createdAt: data.created_at,
-          },
-        });
-        console.log("User with ID: " + data.id + " updated his ACC!");
-      case "user.deleted":
-        user = await prisma.user.delete({
-          where: { id: data.id },
-        });
-        console.log("User with ID: " + data.id + " deleted his ACC!");
-    }
+    try {
+      switch (msg.type) {
+        case "user.created":
+          user = await prisma.user.create({
+            data: {
+              id: data.id,
+              firstName: data.first_name,
+              lastName: data.last_name,
+              email: data.email_addresses.find(
+                (mail) => mail.id === data.primary_email_address_id
+              )!.email_address,
+              profilePictureUrl: data.profile_image_url,
+              createdAt: data.created_at,
+            },
+          });
+          console.log("User created with ID: " + data.id);
+        case "user.updated":
+          user = await prisma.user.update({
+            where: { id: data.id },
+            data: {
+              id: data.id,
+              firstName: data.first_name,
+              lastName: data.last_name,
+              email: data.email_addresses.find(
+                (mail) => mail.id === data.primary_email_address_id
+              )!.email_address,
+              profilePictureUrl: data.profile_image_url,
+              createdAt: data.created_at,
+            },
+          });
+          console.log("User with ID: " + data.id + " updated his ACC!");
+        case "user.deleted":
+          user = await prisma.user.delete({
+            where: { id: data.id },
+          });
+          console.log("User with ID: " + data.id + " deleted his ACC!");
+      }
 
-    res.json({});
+      res.json({});
+    } catch (error: any) {
+      console.error(error);
+      res.status(500).json(error);
+    }
   }
 );
 
