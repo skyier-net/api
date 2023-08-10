@@ -6,7 +6,7 @@ import { createContext } from "./trpc";
 import { appRouter } from "./routers";
 
 const app = express();
-app.use(cors());
+app.use(cors({ origin: "*" }));
 app.use(
   "/trpc",
   trpc.createExpressMiddleware({
@@ -18,3 +18,5 @@ app.use(
 app.use("/clerk", clerkRouter);
 
 app.listen(8000);
+
+export type AppRouter = typeof appRouter;

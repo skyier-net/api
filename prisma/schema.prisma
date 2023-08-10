@@ -28,6 +28,13 @@ enum GroupVisibility {
   PRIVATE
 }
 
+enum Role {
+  VIEWER
+  USER
+  ADMIN
+  CREATOR
+}
+
 model Group {
   id              String            @id @default(uuid())
   title           String
@@ -47,13 +54,6 @@ model GroupInvitation {
   inviter   User    @relation(fields: [inviterId], references: [id])
   role      Role
   inviterId String
-}
-
-enum Role {
-  VIEWER
-  USER
-  ADMIN
-  CREATOR
 }
 
 model UserToGroupRelation {

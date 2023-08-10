@@ -20,7 +20,7 @@ const transporter = nodemailer.createTransport({
 });
 
 export const groupsRouter = t.router({
-  createGroup: adminProcedure
+  createGroup: protectedProcedure
     .input(
       z.object({
         title: z.string().min(7).max(50),
@@ -46,7 +46,7 @@ export const groupsRouter = t.router({
           creator: true,
         },
       });
-      const relation = prisma.userToGroupRelation.create({
+      const relation = await prisma.userToGroupRelation.create({
         data: {
           userId: opts.ctx.user!.id,
           groupId: group.id,
@@ -63,18 +63,19 @@ export const groupsRouter = t.router({
         description: z.string().min(20).max(250),
         defaultRole: z.enum(["ADMIN", "MEMBER", "VIEWER"]).or(z.null()),
         title: z.string().min(7).max(50),
-        groupId: z.string(),
+        groupVisibility: z.enum(["PRIVATE", "UNLISTED", "PUBLIC"]),
       })
     )
     .mutation(async (opts) => {
       const group = await prisma.group.update({
         where: {
-          id: opts.input.groupId,
+          id: opts.ctx.group?.id,
         },
         data: {
           description: opts.input.description,
           defaultRole: (opts.input.defaultRole ?? "VIEWER") as Role,
           title: opts.input.title,
+          groupVisibility: opts.input.groupVisibility as GroupVisibility,
         },
       });
       return {
@@ -86,7 +87,6 @@ export const groupsRouter = t.router({
       z
         .object({
           mail: z.string(),
-          groupId: z.string(),
           role: z.enum(["ADMIN", "MEMBER", "VIEWER"]),
         })
         .partial({
@@ -101,7 +101,7 @@ export const groupsRouter = t.router({
           role: opts.input.role as Role,
           group: {
             connect: {
-              id: opts.input.groupId,
+              id: opts.ctx.group?.id,
             },
           },
           inviter: {
@@ -147,6 +147,8 @@ export const groupsRouter = t.router({
       })
     )
     .mutation(async (opts) => {
+      if (opts.ctx.userGroupRelation?.isBanned)
+        throw new TRPCError({ code: "UNAUTHORIZED" });
       const invitation = await prisma.groupInvitation.delete({
         where: {
           key: opts.input.key,
@@ -175,7 +177,6 @@ export const groupsRouter = t.router({
     .input(
       z.object({
         userId: z.string(),
-        groupId: z.string(),
       })
     )
     .mutation(async (opts) => {
@@ -183,7 +184,7 @@ export const groupsRouter = t.router({
         where: {
           userId_groupId: {
             userId: opts.input.userId,
-            groupId: opts.input.groupId,
+            groupId: opts.ctx.group!.id,
           },
         },
         data: {
@@ -195,7 +196,6 @@ export const groupsRouter = t.router({
     .input(
       z.object({
         userId: z.string(),
-        groupId: z.string(),
         hoursForMute: z.number(),
       })
     )
@@ -204,7 +204,7 @@ export const groupsRouter = t.router({
         where: {
           userId_groupId: {
             userId: opts.input.userId,
-            groupId: opts.input.groupId,
+            groupId: opts.ctx.group!.id,
           },
         },
         data: {
@@ -217,7 +217,6 @@ export const groupsRouter = t.router({
     .input(
       z.object({
         userId: z.string(),
-        groupId: z.string(),
       })
     )
     .mutation(async (opts) => {
@@ -225,7 +224,7 @@ export const groupsRouter = t.router({
         where: {
           userId_groupId: {
             userId: opts.input.userId,
-            groupId: opts.input.groupId,
+            groupId: opts.ctx.group!.id,
           },
         },
       });
