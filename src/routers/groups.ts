@@ -199,7 +199,31 @@ export const groupsRouter = t.router({
       if (!userToGroupRelation) throw new TRPCError({ code: "UNAUTHORIZED" });
       return {};
     }),
-  // TODO: add unban
+  unbanMember: adminProcedure
+    .input(
+      z.object({
+        userId: z.string(),
+      })
+    )
+    .mutation(async (opts) => {
+      const userToGroupRelation = await prisma.userToGroupRelation.update({
+        where: {
+          userId_groupId: {
+            userId: opts.input.userId,
+            groupId: opts.ctx.group!.id,
+          },
+          OR:
+            opts.ctx.userGroupRelation?.role === "ADMIN"
+              ? [{ role: "USER" }, { role: "VIEWER" }]
+              : [{ role: "USER" }, { role: "VIEWER" }, { role: "ADMIN" }],
+        },
+        data: {
+          isBanned: false,
+        },
+      });
+      if (!userToGroupRelation) throw new TRPCError({ code: "UNAUTHORIZED" });
+      return {};
+    }),
   muteMember: adminProcedure
     .input(
       z.object({
@@ -229,7 +253,30 @@ export const groupsRouter = t.router({
         mutedUntil: new Date(Number(userToGroupRelation.mutedUntil)),
       };
     }),
-  // TODO: unban member
+  unmuteMember: adminProcedure
+    .input(
+      z.object({
+        userId: z.string(),
+      })
+    )
+    .mutation(async (opts) => {
+      const userToGroupRelation = await prisma.userToGroupRelation.update({
+        where: {
+          userId_groupId: {
+            userId: opts.input.userId,
+            groupId: opts.ctx.group!.id,
+          },
+          OR:
+            opts.ctx.userGroupRelation?.role === "ADMIN"
+              ? [{ role: "USER" }, { role: "VIEWER" }]
+              : [{ role: "USER" }, { role: "VIEWER" }, { role: "ADMIN" }],
+        },
+        data: {
+          mutedUntil: null,
+        },
+      });
+      return {};
+    }),
   kickMember: adminProcedure
     .input(
       z.object({
