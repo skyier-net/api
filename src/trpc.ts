@@ -72,7 +72,6 @@ const isAdmin = t.middleware(async (opts) => {
   return opts.next({
     ctx: {
       user: opts.ctx.user,
-      role: opts.ctx.userGroupRelation?.role,
     },
   });
 });

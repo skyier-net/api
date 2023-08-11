@@ -5,7 +5,7 @@ import nodemailer from "nodemailer";
 import "dotenv/config";
 
 import { PrismaClient } from "@prisma/client";
-import { WEB_APP_URL } from "../config";
+import { RolesScaler, WEB_APP_URL } from "../config";
 import { TRPCError } from "@trpc/server";
 const prisma = new PrismaClient();
 
@@ -122,7 +122,7 @@ export const groupsRouter = t.router({
           subject: `${invitation.group?.title} group invited You to JOIN!`,
           html: `
           <h2>The group <i>${invitation.group?.title}</i> invited You to JOIN!<br></h2>
-          <p><strong>${opts.ctx.user?.firstName} ${opts.ctx.user?.lastName}</strong> who is <i>${opts.ctx.role}</i> in the <strong>${invitation.group?.title}</strong> group invited You to JOIN!</p><br>
+          <p><strong>${opts.ctx.user?.firstName} ${opts.ctx.user?.lastName}</strong> who is <i>${opts.ctx.userGroupRelation?.role}</i> in the <strong>${invitation.group?.title}</strong> group invited You to JOIN!</p><br>
           <p>There description states so: <i>${invitation.group?.description}</i></p>
           <p>To join the group <strong><a href="${WEB_APP_URL}/groups/${invitation.key}/join">CLICK HERE</a></strong> or open the link below:</p><br>
           <p>${WEB_APP_URL}/groups/${invitation.key}/join</p>
@@ -147,7 +147,7 @@ export const groupsRouter = t.router({
       })
     )
     .mutation(async (opts) => {
-      if (opts.ctx.userGroupRelation?.isBanned)
+      if (opts.ctx.userGroupRelation?.isBanned ?? true)
         throw new TRPCError({ code: "UNAUTHORIZED" });
       const invitation = await prisma.groupInvitation.delete({
         where: {
@@ -172,6 +172,7 @@ export const groupsRouter = t.router({
           role: invitation.role,
         },
       });
+      return {};
     }),
   banMember: adminProcedure
     .input(
@@ -186,12 +187,19 @@ export const groupsRouter = t.router({
             userId: opts.input.userId,
             groupId: opts.ctx.group!.id,
           },
+          OR:
+            opts.ctx.userGroupRelation?.role === "ADMIN"
+              ? [{ role: "USER" }, { role: "VIEWER" }]
+              : [{ role: "USER" }, { role: "VIEWER" }, { role: "ADMIN" }],
         },
         data: {
           isBanned: true,
         },
       });
+      if (!userToGroupRelation) throw new TRPCError({ code: "UNAUTHORIZED" });
+      return {};
     }),
+  // TODO: add unban
   muteMember: adminProcedure
     .input(
       z.object({
@@ -206,13 +214,22 @@ export const groupsRouter = t.router({
             userId: opts.input.userId,
             groupId: opts.ctx.group!.id,
           },
+          OR:
+            opts.ctx.userGroupRelation?.role === "ADMIN"
+              ? [{ role: "USER" }, { role: "VIEWER" }]
+              : [{ role: "USER" }, { role: "VIEWER" }, { role: "ADMIN" }],
         },
         data: {
-          mutedUntil:
-            new Date().getTime() / 1000 + 60 * 60 * opts.input.hoursForMute,
+          mutedUntil: Math.floor(
+            new Date().getTime() + 60 * 60 * opts.input.hoursForMute
+          ),
         },
       });
+      return {
+        mutedUntil: new Date(Number(userToGroupRelation.mutedUntil)),
+      };
     }),
+  // TODO: unban member
   kickMember: adminProcedure
     .input(
       z.object({
@@ -226,7 +243,12 @@ export const groupsRouter = t.router({
             userId: opts.input.userId,
             groupId: opts.ctx.group!.id,
           },
+          OR:
+            opts.ctx.userGroupRelation?.role === "ADMIN"
+              ? [{ role: "USER" }, { role: "VIEWER" }]
+              : [{ role: "USER" }, { role: "VIEWER" }, { role: "ADMIN" }],
         },
       });
+      return {};
     }),
 });
