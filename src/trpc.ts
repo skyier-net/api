@@ -1,7 +1,6 @@
 import * as trpc from "@trpc/server/adapters/express";
-
-import { sessions } from "@clerk/clerk-sdk-node";
-import Cookies from "cookies";
+import jwt from "jsonwebtoken";
+import "dotenv/config";
 
 import { PrismaClient } from "@prisma/client";
 import { inferAsyncReturnType, initTRPC, TRPCError } from "@trpc/server";
@@ -11,22 +10,40 @@ export const createContext = async ({
   req,
   res,
 }: trpc.CreateExpressContextOptions) => {
-  const sessionId = req.query._clerk_session_id;
-  const cookies = new Cookies(req, res);
-  const clientToken = cookies.get("__session");
+  const [clientToken, groupId] = req.headers.authorization
+    ? req.headers.authorization!.split(" ").slice(1)
+    : [null, null];
 
-  const session = await sessions.verifySession(
-    sessionId as string,
-    clientToken!
-  );
+  const decoded = clientToken
+    ? jwt.verify(clientToken, process.env.PEM_PUBLIC_KEY!)
+    : null;
 
   return {
-    user:
-      (await prisma.user.findFirst({
-        where: {
-          id: session.userId,
-        },
-      })) ?? null,
+    user: decoded
+      ? await prisma.user.findUnique({
+          where: {
+            id: decoded?.sub as string,
+          },
+        })
+      : null,
+    group: groupId
+      ? await prisma.group.findUnique({
+          where: {
+            id: groupId,
+          },
+        })
+      : null,
+    userGroupRelation:
+      groupId && decoded
+        ? await prisma.userToGroupRelation.findUnique({
+            where: {
+              userId_groupId: {
+                userId: decoded?.sub as string,
+                groupId: groupId,
+              },
+            },
+          })
+        : null,
   };
 };
 type Context = inferAsyncReturnType<typeof createContext>;
@@ -45,27 +62,16 @@ const isAuthed = t.middleware((opts) => {
 });
 
 const isAdmin = t.middleware(async (opts) => {
-  if (!opts.ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
-  const userGroupRelation = await prisma.userToGroupRelation.findUniqueOrThrow({
-    where: {
-      userId_groupId: {
-        userId: opts.ctx.user.id,
-        groupId: (opts.input as any).groupId,
-      },
-    },
-    select: {
-      role: true,
-    },
-  });
+  if (!opts.ctx.user || opts.ctx.userGroupRelation?.isBanned)
+    throw new TRPCError({ code: "UNAUTHORIZED" });
   if (
-    userGroupRelation.role !== "ADMIN" &&
-    userGroupRelation.role !== "CREATOR"
+    opts.ctx.userGroupRelation?.role !== "ADMIN" &&
+    opts.ctx.userGroupRelation?.role !== "CREATOR"
   )
     throw new TRPCError({ code: "UNAUTHORIZED" });
   return opts.next({
     ctx: {
       user: opts.ctx.user,
-      role: userGroupRelation.role,
     },
   });
 });

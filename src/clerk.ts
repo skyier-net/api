@@ -1,4 +1,4 @@
-import type { WebhookEvent, UserJSON } from "@clerk/clerk-sdk-node";
+import { type WebhookEvent, type UserJSON } from "@clerk/clerk-sdk-node";
 import { Webhook } from "svix";
 import bodyParser from "body-parser";
 import "dotenv/config";

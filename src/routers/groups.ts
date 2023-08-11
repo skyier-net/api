@@ -5,7 +5,7 @@ import nodemailer from "nodemailer";
 import "dotenv/config";
 
 import { PrismaClient } from "@prisma/client";
-import { WEB_APP_URL } from "../config";
+import { RolesScaler, WEB_APP_URL } from "../config";
 import { TRPCError } from "@trpc/server";
 const prisma = new PrismaClient();
 
@@ -20,7 +20,7 @@ const transporter = nodemailer.createTransport({
 });
 
 export const groupsRouter = t.router({
-  createGroup: adminProcedure
+  createGroup: protectedProcedure
     .input(
       z.object({
         title: z.string().min(7).max(50),
@@ -46,7 +46,7 @@ export const groupsRouter = t.router({
           creator: true,
         },
       });
-      const relation = prisma.userToGroupRelation.create({
+      const relation = await prisma.userToGroupRelation.create({
         data: {
           userId: opts.ctx.user!.id,
           groupId: group.id,
@@ -63,18 +63,19 @@ export const groupsRouter = t.router({
         description: z.string().min(20).max(250),
         defaultRole: z.enum(["ADMIN", "MEMBER", "VIEWER"]).or(z.null()),
         title: z.string().min(7).max(50),
-        groupId: z.string(),
+        groupVisibility: z.enum(["PRIVATE", "UNLISTED", "PUBLIC"]),
       })
     )
     .mutation(async (opts) => {
       const group = await prisma.group.update({
         where: {
-          id: opts.input.groupId,
+          id: opts.ctx.group?.id,
         },
         data: {
           description: opts.input.description,
           defaultRole: (opts.input.defaultRole ?? "VIEWER") as Role,
           title: opts.input.title,
+          groupVisibility: opts.input.groupVisibility as GroupVisibility,
         },
       });
       return {
@@ -86,7 +87,6 @@ export const groupsRouter = t.router({
       z
         .object({
           mail: z.string(),
-          groupId: z.string(),
           role: z.enum(["ADMIN", "MEMBER", "VIEWER"]),
         })
         .partial({
@@ -101,7 +101,7 @@ export const groupsRouter = t.router({
           role: opts.input.role as Role,
           group: {
             connect: {
-              id: opts.input.groupId,
+              id: opts.ctx.group?.id,
             },
           },
           inviter: {
@@ -122,7 +122,7 @@ export const groupsRouter = t.router({
           subject: `${invitation.group?.title} group invited You to JOIN!`,
           html: `
           <h2>The group <i>${invitation.group?.title}</i> invited You to JOIN!<br></h2>
-          <p><strong>${opts.ctx.user?.firstName} ${opts.ctx.user?.lastName}</strong> who is <i>${opts.ctx.role}</i> in the <strong>${invitation.group?.title}</strong> group invited You to JOIN!</p><br>
+          <p><strong>${opts.ctx.user?.firstName} ${opts.ctx.user?.lastName}</strong> who is <i>${opts.ctx.userGroupRelation?.role}</i> in the <strong>${invitation.group?.title}</strong> group invited You to JOIN!</p><br>
           <p>There description states so: <i>${invitation.group?.description}</i></p>
           <p>To join the group <strong><a href="${WEB_APP_URL}/groups/${invitation.key}/join">CLICK HERE</a></strong> or open the link below:</p><br>
           <p>${WEB_APP_URL}/groups/${invitation.key}/join</p>
@@ -147,6 +147,8 @@ export const groupsRouter = t.router({
       })
     )
     .mutation(async (opts) => {
+      if (opts.ctx.userGroupRelation?.isBanned ?? true)
+        throw new TRPCError({ code: "UNAUTHORIZED" });
       const invitation = await prisma.groupInvitation.delete({
         where: {
           key: opts.input.key,
@@ -170,12 +172,12 @@ export const groupsRouter = t.router({
           role: invitation.role,
         },
       });
+      return {};
     }),
   banMember: adminProcedure
     .input(
       z.object({
         userId: z.string(),
-        groupId: z.string(),
       })
     )
     .mutation(async (opts) => {
@@ -183,19 +185,49 @@ export const groupsRouter = t.router({
         where: {
           userId_groupId: {
             userId: opts.input.userId,
-            groupId: opts.input.groupId,
+            groupId: opts.ctx.group!.id,
           },
+          OR:
+            opts.ctx.userGroupRelation?.role === "ADMIN"
+              ? [{ role: "USER" }, { role: "VIEWER" }]
+              : [{ role: "USER" }, { role: "VIEWER" }, { role: "ADMIN" }],
         },
         data: {
           isBanned: true,
         },
       });
+      if (!userToGroupRelation) throw new TRPCError({ code: "UNAUTHORIZED" });
+      return {};
+    }),
+  unbanMember: adminProcedure
+    .input(
+      z.object({
+        userId: z.string(),
+      })
+    )
+    .mutation(async (opts) => {
+      const userToGroupRelation = await prisma.userToGroupRelation.update({
+        where: {
+          userId_groupId: {
+            userId: opts.input.userId,
+            groupId: opts.ctx.group!.id,
+          },
+          OR:
+            opts.ctx.userGroupRelation?.role === "ADMIN"
+              ? [{ role: "USER" }, { role: "VIEWER" }]
+              : [{ role: "USER" }, { role: "VIEWER" }, { role: "ADMIN" }],
+        },
+        data: {
+          isBanned: false,
+        },
+      });
+      if (!userToGroupRelation) throw new TRPCError({ code: "UNAUTHORIZED" });
+      return {};
     }),
   muteMember: adminProcedure
     .input(
       z.object({
         userId: z.string(),
-        groupId: z.string(),
         hoursForMute: z.number(),
       })
     )
@@ -204,20 +236,51 @@ export const groupsRouter = t.router({
         where: {
           userId_groupId: {
             userId: opts.input.userId,
-            groupId: opts.input.groupId,
+            groupId: opts.ctx.group!.id,
           },
+          OR:
+            opts.ctx.userGroupRelation?.role === "ADMIN"
+              ? [{ role: "USER" }, { role: "VIEWER" }]
+              : [{ role: "USER" }, { role: "VIEWER" }, { role: "ADMIN" }],
         },
         data: {
-          mutedUntil:
-            new Date().getTime() / 1000 + 60 * 60 * opts.input.hoursForMute,
+          mutedUntil: Math.floor(
+            new Date().getTime() + 60 * 60 * opts.input.hoursForMute
+          ),
         },
       });
+      return {
+        mutedUntil: new Date(Number(userToGroupRelation.mutedUntil)),
+      };
+    }),
+  unmuteMember: adminProcedure
+    .input(
+      z.object({
+        userId: z.string(),
+      })
+    )
+    .mutation(async (opts) => {
+      const userToGroupRelation = await prisma.userToGroupRelation.update({
+        where: {
+          userId_groupId: {
+            userId: opts.input.userId,
+            groupId: opts.ctx.group!.id,
+          },
+          OR:
+            opts.ctx.userGroupRelation?.role === "ADMIN"
+              ? [{ role: "USER" }, { role: "VIEWER" }]
+              : [{ role: "USER" }, { role: "VIEWER" }, { role: "ADMIN" }],
+        },
+        data: {
+          mutedUntil: null,
+        },
+      });
+      return {};
     }),
   kickMember: adminProcedure
     .input(
       z.object({
         userId: z.string(),
-        groupId: z.string(),
       })
     )
     .mutation(async (opts) => {
@@ -225,9 +288,14 @@ export const groupsRouter = t.router({
         where: {
           userId_groupId: {
             userId: opts.input.userId,
-            groupId: opts.input.groupId,
+            groupId: opts.ctx.group!.id,
           },
+          OR:
+            opts.ctx.userGroupRelation?.role === "ADMIN"
+              ? [{ role: "USER" }, { role: "VIEWER" }]
+              : [{ role: "USER" }, { role: "VIEWER" }, { role: "ADMIN" }],
         },
       });
+      return {};
     }),
 });
