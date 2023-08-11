@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { adminProcedure, protectedProcedure, t } from "../trpc";
+import {
+  adminProcedure,
+  protectedProcedure,
+  puclicProcedure,
+  t,
+} from "../trpc";
 import { GroupVisibility, Role } from "@prisma/client";
 import nodemailer from "nodemailer";
 import "dotenv/config";
@@ -152,19 +157,23 @@ export const groupsRouter = t.router({
       const invitation = await prisma.groupInvitation.delete({
         where: {
           key: opts.input.key,
+          mail: opts.ctx.user.email,
         },
         include: {
           group: true,
         },
       });
       if (!invitation) throw new TRPCError({ code: "NOT_FOUND" });
-      if (opts.ctx.user.email != invitation.mail)
-        throw new TRPCError({ code: "UNAUTHORIZED" });
-      const user = await prisma.user.findUniqueOrThrow({
-        where: {
-          email: invitation.mail,
-        },
-      });
+      try {
+        const deleted = await prisma.userToGroupRelation.delete({
+          where: {
+            userId_groupId: {
+              userId: opts.ctx.user!.id,
+              groupId: invitation.group.id,
+            },
+          },
+        });
+      } catch (e) {}
       const relation = await prisma.userToGroupRelation.create({
         data: {
           groupId: invitation.group.id,
@@ -297,5 +306,62 @@ export const groupsRouter = t.router({
         },
       });
       return {};
+    }),
+  showMails: puclicProcedure
+    .input(
+      z.object({
+        mailOrName: z.string(),
+      })
+    )
+    .mutation(async (opts) => {
+      const mails = await prisma.user.findMany({
+        where: {
+          OR: !opts.input.mailOrName.includes(" ")
+            ? !opts.input.mailOrName.includes(".") &&
+              !opts.input.mailOrName.includes("@")
+              ? [
+                  {
+                    email: {
+                      contains: opts.input.mailOrName,
+                    },
+                  },
+                  {
+                    firstName: {
+                      contains: opts.input.mailOrName,
+                    },
+                  },
+                  {
+                    lastName: {
+                      contains: opts.input.mailOrName,
+                    },
+                  },
+                ]
+              : [
+                  {
+                    email: {
+                      contains: opts.input.mailOrName,
+                    },
+                  },
+                ]
+            : [
+                {
+                  firstName: {
+                    contains: opts.input.mailOrName.split(" ")[0],
+                  },
+                },
+                {
+                  lastName: {
+                    contains: opts.input.mailOrName.split(" ")[1],
+                  },
+                },
+              ],
+        },
+        select: {
+          email: true,
+        },
+      });
+      return {
+        mails: mails.map((mail) => mail.email),
+      };
     }),
 });
