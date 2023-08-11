@@ -1,5 +1,10 @@
 import { z } from "zod";
-import { adminProcedure, protectedProcedure, t } from "../trpc";
+import {
+  adminProcedure,
+  protectedProcedure,
+  puclicProcedure,
+  t,
+} from "../trpc";
 import { GroupVisibility, Role } from "@prisma/client";
 import nodemailer from "nodemailer";
 import "dotenv/config";
@@ -301,5 +306,62 @@ export const groupsRouter = t.router({
         },
       });
       return {};
+    }),
+  showMails: puclicProcedure
+    .input(
+      z.object({
+        mailOrName: z.string(),
+      })
+    )
+    .mutation(async (opts) => {
+      const mails = await prisma.user.findMany({
+        where: {
+          OR: !opts.input.mailOrName.includes(" ")
+            ? !opts.input.mailOrName.includes(".") &&
+              !opts.input.mailOrName.includes("@")
+              ? [
+                  {
+                    email: {
+                      contains: opts.input.mailOrName,
+                    },
+                  },
+                  {
+                    firstName: {
+                      contains: opts.input.mailOrName,
+                    },
+                  },
+                  {
+                    lastName: {
+                      contains: opts.input.mailOrName,
+                    },
+                  },
+                ]
+              : [
+                  {
+                    email: {
+                      contains: opts.input.mailOrName,
+                    },
+                  },
+                ]
+            : [
+                {
+                  firstName: {
+                    contains: opts.input.mailOrName.split(" ")[0],
+                  },
+                },
+                {
+                  lastName: {
+                    contains: opts.input.mailOrName.split(" ")[1],
+                  },
+                },
+              ],
+        },
+        select: {
+          email: true,
+        },
+      });
+      return {
+        mails: mails.map((mail) => mail.email),
+      };
     }),
 });
