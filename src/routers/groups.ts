@@ -152,19 +152,23 @@ export const groupsRouter = t.router({
       const invitation = await prisma.groupInvitation.delete({
         where: {
           key: opts.input.key,
+          mail: opts.ctx.user.email,
         },
         include: {
           group: true,
         },
       });
       if (!invitation) throw new TRPCError({ code: "NOT_FOUND" });
-      if (opts.ctx.user.email != invitation.mail)
-        throw new TRPCError({ code: "UNAUTHORIZED" });
-      const user = await prisma.user.findUniqueOrThrow({
-        where: {
-          email: invitation.mail,
-        },
-      });
+      try {
+        const deleted = await prisma.userToGroupRelation.delete({
+          where: {
+            userId_groupId: {
+              userId: opts.ctx.user!.id,
+              groupId: invitation.group.id,
+            },
+          },
+        });
+      } catch (e) {}
       const relation = await prisma.userToGroupRelation.create({
         data: {
           groupId: invitation.group.id,
